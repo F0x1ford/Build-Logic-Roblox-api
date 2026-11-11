@@ -10,7 +10,7 @@ const server = http.createServer((req, res) => {
 
   const url = new URL(req.url, "http://localhost");
 
-  if (url.searchParams.get("sid") !== SID) {
+  if (req.headers["sid"] !== SID) {
     res.writeHead(403);
     return res.end(JSON.stringify({ error: "Invalid SID" }));
   }
