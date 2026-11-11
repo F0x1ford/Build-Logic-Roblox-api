@@ -31,10 +31,12 @@ const server = http.createServer((req, res) => {
       .join("");
 
     res.writeHead(200, {
-      "Content-Type": "text/plain"
+      "Content-Type": "application/json"
     });
 
-    return res.end(binary);
+    return res.end(JSON.stringify({
+      value: binary
+    }));
   }
 
   res.writeHead(404);
