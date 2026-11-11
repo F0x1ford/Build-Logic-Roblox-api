@@ -10,41 +10,37 @@ const server = http.createServer((req, res) => {
 
   const url = new URL(req.url, "http://localhost");
 
-  if (req.headers["sid"] !== SID) {
-    res.writeHead(403);
-    return res.end(JSON.stringify({ error: "Invalid SID" }));
+  // Page d'accueil
+  if (url.pathname === "/") {
+    res.writeHead(200);
+    return res.end(JSON.stringify({
+      status: "online"
+    }));
   }
 
+  // Vérification du SID envoyé dans les headers
+  if (req.headers.sid !== SID) {
+    res.writeHead(403);
+    return res.end(JSON.stringify({
+      error: "Invalid SID"
+    }));
+  }
+
+  // Données destinées à Build Logic
   if (req.method === "GET" &&
       url.pathname === "/typewriter/read") {
-    return res.end(JSON.stringify({ value }));
-  }
-
-  if (req.method === "POST" &&
-      url.pathname === "/typewriter/edit") {
-    let body = "";
-
-    req.on("data", chunk => body += chunk);
-
-    req.on("end", () => {
-      try {
-        const data = JSON.parse(body);
-        if (typeof data.value !== "string") {
-          throw new Error("Invalid value");
-        }
-
-        value = data.value;
-        res.end(JSON.stringify({ success: true, value }));
-      } catch {
-        res.writeHead(400);
-        res.end(JSON.stringify({ error: "Invalid JSON" }));
-      }
-    });
-    return;
+    res.writeHead(200);
+    return res.end(JSON.stringify({
+      value: value
+    }));
   }
 
   res.writeHead(404);
-  res.end(JSON.stringify({ error: "Not found" }));
+  res.end(JSON.stringify({
+    error: "Not found"
+  }));
 });
 
-server.listen(process.env.PORT || 3000);
+server.listen(process.env.PORT || 3000, () => {
+  console.log("API online");
+});
