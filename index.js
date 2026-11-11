@@ -5,42 +5,40 @@ const SID = "0421";
 let value = "Bonjour";
 
 const server = http.createServer((req, res) => {
-  res.setHeader("Content-Type", "application/json");
-  res.setHeader("Access-Control-Allow-Origin", "*");
-
   const url = new URL(req.url, "http://localhost");
 
-  // Page d'accueil
   if (url.pathname === "/") {
-    res.writeHead(200);
-    return res.end(JSON.stringify({
-      status: "online"
-    }));
+    res.writeHead(200, {
+      "Content-Type": "text/plain"
+    });
+    return res.end("online");
   }
 
-  // Vérification du SID envoyé dans les headers
   if (req.headers.sid !== SID) {
     res.writeHead(403);
-    return res.end(JSON.stringify({
-      error: "Invalid SID"
-    }));
+    return res.end("Invalid SID");
   }
 
-  // Données destinées à Build Logic
   if (req.method === "GET" &&
       url.pathname === "/typewriter/read") {
-    res.writeHead(200);
-    return res.end(JSON.stringify({
-      value: value
-    }));
+
+    const binary = Buffer.from(value, "utf8")
+      .toString("hex")
+      .match(/.{2}/g)
+      .map(byte => parseInt(byte, 16)
+        .toString(2)
+        .padStart(8, "0"))
+      .join("");
+
+    res.writeHead(200, {
+      "Content-Type": "text/plain"
+    });
+
+    return res.end(binary);
   }
 
   res.writeHead(404);
-  res.end(JSON.stringify({
-    error: "Not found"
-  }));
+  res.end("Not found");
 });
 
-server.listen(process.env.PORT || 3000, () => {
-  console.log("API online");
-});
+server.listen(process.env.PORT || 3000);
