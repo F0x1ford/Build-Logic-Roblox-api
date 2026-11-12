@@ -4,34 +4,32 @@ const cors = require("cors");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const SID = process.env.SID || "0421";
+const PASSWORD = process.env.PASSWORD || "0421";
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const queues = new Map();
+// File d'attente des caractères
+let queue = [];
+let currentMessage = "";
 
-function getSid(req) {
-  return String(
-    req.get("sid") ||
-    req.query.sid ||
-    req.body?.sid ||
-    SID
-  );
+// Vérification du mot de passe
+function checkPassword(req, res, next) {
+  const password = req.get("Password");
+
+  if (password !== PASSWORD) {
+    return res.status(401).json({
+      error: "Mot de passe incorrect"
+    });
+  }
+
+  next();
 }
 
-function getQueue(sid) {
-  if (!queues.has(sid)) queues.set(sid, []);
-  return queues.get(sid);
-}
-
-function checkSid(req) {
-  return getSid(req) === SID;
-}
-
+// Page web pour écrire un message
 app.get("/", (req, res) => {
-  res.type("html").send(`
+  res.send(`
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -57,14 +55,17 @@ textarea {
   height: 130px;
   box-sizing: border-box;
   padding: 12px;
+  border-radius: 8px;
 }
 button {
   width: 100%;
   padding: 14px;
   margin-top: 12px;
   background: #6c8cff;
+  color: white;
   border: 0;
   border-radius: 8px;
+  font-size: 16px;
 }
 </style>
 </head>
@@ -89,14 +90,14 @@ async function sendMessage() {
     const response = await fetch("/typewriter/send", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({message, sid: "0421"})
+      body: JSON.stringify({message})
     });
 
     const data = await response.json();
 
     if (!response.ok) throw new Error(data.error);
 
-    status.textContent = data.message;
+    status.textContent = "Message envoyé !";
   } catch (error) {
     status.textContent = "Erreur : " + error.message;
   }
@@ -107,57 +108,42 @@ async function sendMessage() {
   `);
 });
 
+// Le site envoie un message à l'API
 app.post("/typewriter/send", (req, res) => {
-  const sid = getSid(req);
-  const message = req.body?.message;
-
-  if (sid !== SID) {
-    return res.status(403).json({error: "SID incorrect"});
-  }
+  const message = req.body.message;
 
   if (typeof message !== "string" || !message.length) {
-    return res.status(400).json({error: "Message manquant"});
+    return res.status(400).json({error: "Message vide"});
   }
 
   if (message.length > 200) {
     return res.status(400).json({error: "Message trop long"});
   }
 
-  const bytes = Buffer.from(message, "utf8");
-  const queue = getQueue(sid);
-
-  queue.push(...bytes);
+  currentMessage = message;
+  queue = Array.from(Buffer.from(message, "utf8"));
 
   res.json({
     ok: true,
-    message: "Message envoyé !",
-    bytesAdded: bytes.length,
-    bytesWaiting: queue.length
+    message: "Message ajouté à la file",
+    characters: message.length
   });
 });
 
-function readNext(req, res) {
-  const sid = getSid(req);
-
-  if (!checkSid(req)) {
-    return res.status(403).json({error: "SID incorrect"});
-  }
-
-  const queue = getQueue(sid);
-  const byte = queue.length ? queue.shift() : 0;
+// Build Logic récupère un octet binaire à chaque GET
+app.get("/typewriter/read", checkPassword, (req, res) => {
+  const byte = queue.length > 0 ? queue.shift() : 0;
   const binary = byte.toString(2).padStart(8, "0");
 
   res.set("Cache-Control", "no-store");
   res.json({value: binary});
-}
+});
 
-app.get("/typewriter/read", readNext);
-app.post("/typewriter/read", readNext);
-
+// Vérifier que le serveur fonctionne
 app.get("/health", (req, res) => {
   res.json({online: true});
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log("Typewriter lancé sur le port " + PORT);
+  console.log("Build Logic Typewriter lancé sur le port " + PORT);
 });
